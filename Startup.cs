@@ -7,6 +7,7 @@ using WebApi.Authorization;
 using WebApi.Entities;
 using WebApi.Helpers;
 using WebApi.Services;
+using Microsoft.EntityFrameworkCore;
 
 namespace WebApi
 {
@@ -22,6 +23,9 @@ namespace WebApi
         // add services to the DI container
         public void ConfigureServices(IServiceCollection services)
         {
+            services.AddDbContext<PgDbContext>(options =>
+                        options.UseNpgsql(Configuration.GetConnectionString("Postgres")));
+
             services.AddDbContext<DataContext>();
             services.AddCors();
             services.AddControllers().AddJsonOptions(x => x.JsonSerializerOptions.IgnoreNullValues = true);
@@ -35,9 +39,15 @@ namespace WebApi
         }
 
         // configure the HTTP request pipeline
-        public void Configure(IApplicationBuilder app, IWebHostEnvironment env, DataContext context)
+        public void Configure(IApplicationBuilder app, IWebHostEnvironment env, DataContext dataContext)
         {
-            createTestUser(context);
+            using (var serviceScope = app.ApplicationServices.GetService<IServiceScopeFactory>().CreateScope())
+            {
+                var context = serviceScope.ServiceProvider.GetRequiredService<PgDbContext>();
+                context.Database.EnsureCreated();
+            }
+
+            createTestUser(dataContext);
 
             app.UseRouting();
 
